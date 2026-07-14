@@ -4,3 +4,16 @@
 
 
 Black Swan
+
+# Hwo to clone the repo
+
+```bash
+
+git clone https://github.com/Iankulani/black_swan.git
+cd black_swan
+```
+
+# How to run
+```bash
+python black_swan.py
+``` 
