@@ -1,0 +1,128 @@
+# BLACK_SWAN_V4 Dockerfile
+# Based on Alpine Linux for minimal footprint
+
+FROM alpine:3.19 AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    python3-dev \
+    py3-pip \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo \
+    git \
+    make \
+    cmake \
+    linux-headers \
+    build-base \
+    libpcap-dev \
+    libxml2-dev \
+    libxslt-dev \
+    nmap \
+    curl \
+    wget \
+    netcat-openbsd \
+    traceroute \
+    whois \
+    bind-tools \
+    openssh-client \
+    docker \
+    docker-cli-compose
+
+# Set Python environment
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt requirements-minimal.txt ./
+
+# Install Python packages
+RUN pip3 install --no-cache-dir -r requirements.txt || \
+    pip3 install --no-cache-dir -r requirements-minimal.txt
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p .black_swan_v4 \
+    black_swan_v4_reports \
+    temp \
+    logs
+
+# Set permissions
+RUN chmod +x black_swan.py
+RUN chmod +x scripts/*.sh
+
+# Final stage - slim image
+FROM alpine:3.19
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    libpcap \
+    nmap \
+    curl \
+    wget \
+    netcat-openbsd \
+    traceroute \
+    whois \
+    bind-tools \
+    openssh-client \
+    docker \
+    docker-cli-compose \
+    tcpdump \
+    hping3 \
+    dnsutils \
+    iptables \
+    iputils \
+    nano \
+    vim \
+    tmux \
+    screen \
+    htop \
+    iftop \
+    nethogs \
+    iotop \
+    strace
+
+# Copy Python packages from builder
+COPY --from=builder /usr/lib/python3.11/site-packages /usr/lib/python3.11/site-packages
+COPY --from=builder /usr/bin /usr/bin
+
+# Set working directory
+WORKDIR /app
+
+# Copy application
+COPY --from=builder /app /app
+
+# Create necessary directories
+RUN mkdir -p /app/.black_swan_v4 \
+    /app/black_swan_v4_reports \
+    /app/temp \
+    /app/logs
+
+# Create non-root user
+RUN adduser -D -h /home/blackswan blackswan && \
+    chown -R blackswan:blackswan /app
+
+# Switch to non-root user
+USER blackswan
+
+# Expose ports
+EXPOSE 5000 8080 8443 9000 6000-6100
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD python3 -c "import socket; s=socket.socket(); s.connect(('localhost', 5000))" || exit 1
+
+# Entry point
+ENTRYPOINT ["python3", "black_swan.py"]

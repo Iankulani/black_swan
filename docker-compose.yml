@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  black_swan:
+    build: .
+    container_name: black_swan_v4
+    restart: unless-stopped
+    ports:
+      - "5000:5000"      # Web Dashboard
+      - "8080:8080"      # Phishing Server
+      - "8443:8443"      # HTTPS
+      - "9000:9000"      # C2 Server
+      - "6000-6100:6000-6100"  # Agent ports
+    volumes:
+      - ./data:/app/.black_swan_v4
+      - ./reports:/app/black_swan_v4_reports
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock  # For Docker commands
+      - /usr/bin/docker:/usr/bin/docker            # Docker binary
+      - ./temp:/app/temp
+    environment:
+      - PYTHONUNBUFFERED=1
+      - BLACK_SWAN_HOME=/app
+      - TZ=UTC
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - SYS_TIME
+    command: ["python3", "black_swan.py"]
+    
+  redis:
+    image: redis:alpine
+    container_name: black_swan_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+    command: redis-server --appendonly yes
+    
+  postgres:
+    image: postgres:15-alpine
+    container_name: black_swan_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: blackswan
+      POSTGRES_PASSWORD: swan_secure_2024
+      POSTGRES_DB: black_swan_v4
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blackswan"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web_nginx:
+    image: nginx:alpine
+    container_name: black_swan_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web-static:/usr/share/nginx/html
+    depends_on:
+      - black_swan
