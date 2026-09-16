@@ -20,3 +20,5 @@ python black_swan.py
 
 
 # Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Iankulani/black_swan&type=Date)](https://star-history.com/#Iankulani/black_swan&Date)
